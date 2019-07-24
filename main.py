@@ -26,7 +26,8 @@ UL_MARGIN = 50
 #Flappy globals
 FALL_VELOCITY = 4
 JUMP_VELOCITY = 5.5
-JUMP_HEIGHT = 65
+JUMP_HEIGHT = 60
+HIGHSCORE = 0
 
 #Background and Base scroll speeds
 BACKGROUND_SPEED = 1
@@ -59,7 +60,16 @@ GAMEOVER_SPRITE = "assets/sprites/gameover.png"
 GAMEOVER_POS = (int((WINDOW_WIDTH - 250) / 2), int((WINDOW_HEIGHT - 126) / 2))
 
 def main():
-    global GAME_STATE
+    global GAME_STATE, HIGHSCORE
+    #Get High Score from file
+    with open("lib/save_game.paras", "a+") as save_game:
+        save_game.seek(0)
+        txt = save_game.readlines()
+        if len(txt) != 1:
+            save_game.truncate(0)
+            save_game.write("0")
+        else:
+            HIGHSCORE = int(txt[0])
     #Initialise pygame
     pygame.init()
     #Draw window to screen 500 x 800
@@ -87,6 +97,102 @@ def main():
     BASE = Scroller.Scroller(SPRITES['base'], BASE_SPEED, WINDOW_WIDTH)
     BACKGROUND = Scroller.Scroller(SPRITES['backGround'], BACKGROUND_SPEED, WINDOW_WIDTH)
 
+    def updateHighscore(score):
+        global HIGHSCORE
+        HIGHSCORE = score
+        with open("lib/save_game.paras", "w+") as save_game:
+            save_game.truncate(0)
+            save_game.write(str(score))    
+
+    def renderNumber(number, ySize, gap, pos):
+        listNumber = list(str(number))
+        letters = len(listNumber)
+        for i in listNumber:
+            listNumber[listNumber.index(i)] = int(i)
+        xSize = int(ySize * (2/3))
+        leftSide = pos[0] - (letters*(xSize + gap)/2)
+        offset = xSize + 5
+        for i in range(letters):
+            SCREEN.blit(pygame.transform.scale(SPRITES['numbers'][listNumber[i]], (xSize, ySize)), (leftSide + (i*offset), pos[1]))
+
+    def checkCollisions():
+        global SCORE
+        if BIRD.uLCollision():
+            endGame()
+        for i in PIPES:
+            col = i.collisionChecks(BIRD.getPos(), SPRITES['bird'][1].get_size())
+            if col == "collision":
+                endGame()
+            elif col == "awardPoint":
+                SCORE += 1
+
+
+    def renderBackground():
+        newBackGroundPos = BACKGROUND.updatePositions()
+        SCREEN.blit(SPRITES["backGround"], (newBackGroundPos[0], 0))
+        SCREEN.blit(SPRITES["backGround"], (newBackGroundPos[1], 0))
+
+    def renderBase():
+        newBasePos = BASE.updatePositions()
+        SCREEN.blit(SPRITES["base"], (newBasePos[0], BASE_HEIGHT))
+        SCREEN.blit(SPRITES["base"], (newBasePos[1], BASE_HEIGHT))
+
+    def drawGameOver():
+        global SCORE, HIGHSCORE
+        renderBackground()
+        renderBase()
+        SCREEN.blit(SPRITES["gameOver"], GAMEOVER_POS)
+        renderNumber(SCORE, 22, 5, (GAMEOVER_POS[0] + 205, GAMEOVER_POS[1] + 36))
+        renderNumber(HIGHSCORE, 22, 5, (GAMEOVER_POS[0] + 205, GAMEOVER_POS[1] + 82))
+
+    def drawStartScreen():
+        renderBackground()
+        renderBase()
+        SCREEN.blit(SPRITES['startGame'], START_GAME_POS)
+
+    def endGame():
+        global GAME_STATE, PIPES, BIRD, SCORE, HIGHSCORE
+        PIPES = []
+        BIRD = None
+        if SCORE > HIGHSCORE:
+            updateHighscore(SCORE)
+        GAME_STATE = 1
+
+    def renderGame():
+        global SCORE
+
+        #Render Background
+        renderBackground()
+        
+        #Check Collisions
+        checkCollisions()
+
+        #Draw bird and update animation
+        SCREEN.blit(SPRITES['bird'][BIRD.getAniIter()], BIRD.getPos())
+        BIRD.updatePos()
+        BIRD.incrementAniIter()
+        BIRD.incrementCounter()
+
+        #Loop through Pipes and draw
+        for pipe in PIPES:
+            if pipe.updatePos():
+                SCREEN.blit(SPRITES['pipeUp'], pipe.getLowerPos())
+                SCREEN.blit(SPRITES['pipeDown'], pipe.getUpperPos())
+            else:
+                PIPES.append(Pipe.Pipe(PIPE_SPEED, 
+                    PIPE_GAP, 
+                    PIPE_DISTANCE,
+                    PIPE_WIDTH,
+                    PIPE_HEIGHT,
+                    WINDOW_HEIGHT, 
+                    WINDOW_WIDTH, 
+                    BASE_HEIGHT, 
+                    UL_MARGIN))
+        renderNumber(SCORE, 40, 10, (WINDOW_WIDTH/2, 10))
+        
+        renderBase()
+
+
     run = True
     while run:
         for event in pygame.event.get():  # Loop through a list of events
@@ -113,90 +219,6 @@ def main():
                 run = False    # End the loop
                 pygame.quit()  # Quit the game
                 quit()
-
-        def renderScore(ySize, gap, pos):
-            global SCORE
-            number = SCORE
-            listNumber = list(str(number))
-            letters = len(listNumber)
-            for i in listNumber:
-                listNumber[listNumber.index(i)] = int(i)
-            xSize = int(ySize * (2/3))
-            leftSide = pos[0] - (letters*(xSize + gap)/2)
-            offset = xSize + 5
-            for i in range(letters):
-                SCREEN.blit(pygame.transform.scale(SPRITES['numbers'][listNumber[i]], (xSize, ySize)), (leftSide + (i*offset), pos[1]))
-
-        def checkCollisions():
-            global SCORE
-            if BIRD.uLCollision():
-                endGame()
-            for i in PIPES:
-                col = i.collisionChecks(BIRD.getPos(), SPRITES['bird'][1].get_size())
-                if col == "collision":
-                    endGame()
-                elif col == "awardPoint":
-                    SCORE += 1
-
-
-        def renderBackground():
-            newBackGroundPos = BACKGROUND.updatePositions()
-            SCREEN.blit(SPRITES["backGround"], (newBackGroundPos[0], 0))
-            SCREEN.blit(SPRITES["backGround"], (newBackGroundPos[1], 0))
-
-        def renderBase():
-            newBasePos = BASE.updatePositions()
-            SCREEN.blit(SPRITES["base"], (newBasePos[0], BASE_HEIGHT))
-            SCREEN.blit(SPRITES["base"], (newBasePos[1], BASE_HEIGHT))
-
-        def drawGameOver():
-            renderBackground()
-            renderBase()
-            SCREEN.blit(SPRITES["gameOver"], GAMEOVER_POS)
-            renderScore(22, 5, (GAMEOVER_POS[0] + 205, GAMEOVER_POS[1] + 36))
-
-        def drawStartScreen():
-            renderBackground()
-            renderBase()
-            SCREEN.blit(SPRITES['startGame'], START_GAME_POS)
-
-        def endGame():
-            global GAME_STATE, PIPES, BIRD, SCORE
-            PIPES = []
-            BIRD = None
-            GAME_STATE = 1
-
-        def renderGame():
-            #Render Background
-            renderBackground()
-            
-            #Check Collisions
-            checkCollisions()
-
-            #Draw bird and update animation
-            SCREEN.blit(SPRITES['bird'][BIRD.getAniIter()], BIRD.getPos())
-            BIRD.updatePos()
-            BIRD.incrementAniIter()
-            BIRD.incrementCounter()
-
-            #Loop through Pipes and draw
-            for pipe in PIPES:
-                if pipe.updatePos():
-                    SCREEN.blit(SPRITES['pipeUp'], pipe.getLowerPos())
-                    SCREEN.blit(SPRITES['pipeDown'], pipe.getUpperPos())
-                else:
-                    PIPES.append(Pipe.Pipe(PIPE_SPEED, 
-                        PIPE_GAP, 
-                        PIPE_DISTANCE,
-                        PIPE_WIDTH,
-                        PIPE_HEIGHT,
-                        WINDOW_HEIGHT, 
-                        WINDOW_WIDTH, 
-                        BASE_HEIGHT, 
-                        UL_MARGIN))
-            renderScore(40, 10, (WINDOW_WIDTH/2, 10))
-            
-            renderBase()
 
         if GAME_STATE == 0:
             drawStartScreen()
