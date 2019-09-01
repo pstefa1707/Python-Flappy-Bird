@@ -8,3 +8,6 @@ Flappy bird recreated in python, with the use of the pygame library.
 
 ### Usage
 Navigate to project directory, `python main.py`
+
+### ScreenShot
+![Image](https://i.ibb.co/prPFCQ1/Flappy-bird.png)
